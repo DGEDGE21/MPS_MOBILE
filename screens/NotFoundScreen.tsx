@@ -1,36 +1,326 @@
-import { StyleSheet, TouchableOpacity } from 'react-native';
 
+import { Button, TextInput,TouchableOpacity,StyleSheet ,Image} from 'react-native';
+import React,{useState,useEffect} from 'react';
+import { Platform } from 'react-native';
+import { RootTabScreenProps } from '../types';
+import { BarCodeScanner } from 'expo-barcode-scanner';
+import {Ionicons,AntDesign,MaterialCommunityIcons,Feather,MaterialIcons} from '@expo/vector-icons'
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+import ImagePicker from 'react-native-image-picker';
 import { Text, View } from '../components/Themed';
 import { RootStackScreenProps } from '../types';
 
 export default function NotFoundScreen({ navigation }: RootStackScreenProps<'NotFound'>) {
+  
+  const [TemPermissao,setTemPermissao]=useState(null);
+  const [scanner,setScanner]=useState(false);
+  const [token,setToken]=useState();
+  const [text,setText]=useState('')
+  const [barcode,setbarcode]=useState(false);
+  const [dados,setDados]=useState(null);
+  const [nome,setNome]=useState('');
+  const [pesquisa,setPesquisa]=useState('sdsd');
+  const [valor,setValor]=useState('');
+  const [tarifas,setTarifas]=useState(null)
+  const [tarifasb,setTarifasb]=useState('dfdf')
+  const askForCameraPermission =()=>{
+    
+    (async ()=>{
+      console.log('pass')
+     
+      const {status}=await  BarCodeScanner.requestPermissionsAsync();
+      setTemPermissao(status=='granted')
+    })()
+  }
+const Obter_token=()=>{
+(async ()=>{
+    let result = await SecureStore.getItemAsync('token');
+    setToken(result)
+  })()
+
+}
+useEffect(()=>{
+  Obter_token();
+   
+},)
+  useEffect(()=>{
+    askForCameraPermission();
+    console.log('sd')
+  }, []);
+  const Barcode=()=>{
+    setScanner(false)
+    setbarcode(!barcode);
+  }
+  const Paga_Mpesa=()=>{
+    axios({
+      method:"POST",
+      url:`https://www.mapisis.com/web/paymethod/`,
+      headers:{'Authorization':`token ${token}`,'Content-Type':'application/json' },
+      data:{numero:dados.telefone,valor:valor}
+  }).then(dat=>{ if(dat.status!==200){
+      throw Error('Dados de acesso invalidos');  
+          }
+      
+      return dat
+   } ).then( d=>{ 
+                 console.log(d.data)
+                }
+     ).catch(e=>{
+      console.log(e.message) 
+      console.log(token)
+    })
+    
+  }
+  
+  const optinos={
+    noData:true
+  };
+  
+  const Choose=()=>{
+    ImagePicker.launchImageLibrary(optinos,response=>{
+      console.log(response)
+    })
+  }
+  const Step_tarif=()=>{
+    axios({
+      method:"POST",
+      url:`https://www.mapisis.com/web/step_tarif/`,
+      headers:{'Authorization':`token ${token}`,'Content-Type':'application/json' },
+      data:{contador:text,valor:valor,unidade:'Mzn'}
+  }).then(dat=>{ if(dat.status!==200){
+      throw Error('Dados de acesso invalidos');  
+          }
+      
+      return dat
+   } ).then( d=>{ 
+                  console.log(d.data); 
+                  setTarifas(d.data);      
+                setTarifasb(null);
+                }
+     ).catch(e=>{
+      console.log(e.message) 
+      console.log(token)
+    })
+    
+  }
+  const Mhandler=()=>{
+    Paga_Mpesa();
+  }
+  const Procura=()=>{
+    axios({
+      method:"get",
+      url:`https://www.mapisis.com/web/contador/`,
+      headers:{'Authorization':`token ${token}`,'Content-Type':'application/json' },
+      params:{contador:text}
+  }).then(dat=>{ if(dat.status!==200){
+      throw Error('Dados de acesso invalidos');  
+          }
+      
+      return dat
+   } ).then( d=>{ 
+                  setDados(d.data)
+                  setNome(d.data.nome)
+                  console.log(d.data); 
+                  setPesquisa(null);
+                }
+     ).catch(e=>{
+      console.log(e.message) 
+      console.log(token)
+    })
+      }
+  const Handler=()=>{
+    Procura()
+  }
+  const handlercodigo=({type,data})=>{
+    setScanner(true)
+    setText(data)
+    setbarcode(!barcode)
+    
+  }
+  const Handertarif=()=>{
+    Step_tarif();
+  }
+  if(TemPermissao==null){
+    return(
+      <View style={styles.container}>
+        <Text>Requesting camera permissio</Text>
+    </View>    
+    )
+  
+  }
+  if(TemPermissao==false){
+    return(
+      <View style={styles.container}>
+        <Text>No acess </Text>
+        <Button title={'allow'} onPress={()=>askForCameraPermission()}/>
+    </View>    
+    )
+  }
+  
+  
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>This screen doesn't exist.</Text>
-      <TouchableOpacity onPress={() => navigation.replace('Root')} style={styles.link}>
-        <Text style={styles.linkText}>Go to home screen!</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.barcode}>
+      <Text style={styles.word}>Numero de Contador</Text>
+      {barcode ? <BarCodeScanner
+                  onBarCodeScanned={scanner?undefined:handlercodigo}
+        style={{height:100,width:'100%'}}/>:true }  
+      <View style={styles.action}>
+                
+                 
+                <TextInput placeholder='Digite o numero de contador' 
+                style={styles.TextInput}
+                autoCapitalize="none"
+                onChangeText={(val)=>setText(val)}
+
+                value={text}
+               
+               />
+              
+               <TouchableOpacity onPress={()=>Barcode()}>
+                {barcode ?<MaterialCommunityIcons name='barcode-off' 
+                size={20} 
+                color="#019d95"/>:<MaterialCommunityIcons name='barcode-scan' 
+                size={20} 
+                color="#019d95"/>} 
+                 
+         </TouchableOpacity>
+        
+                </View>
+                {pesquisa &&       <TouchableOpacity
+                    style={styles.loginScreenButton}
+                    underlayColor='#fff'>
+          <Text style={styles.loginText} onPress={()=>Handler()}>Pesquisar</Text>
+             </TouchableOpacity>
+           }
+            {dados && <View style={styles.infosa}>
+            <Text style={styles.words}>Cliente associado ao contador</Text>
+               
+               <View style={styles.infos}>
+               <Ionicons name='person' 
+                 size={20} 
+                 color="#fff"/>               
+                      <TextInput value={nome}    style={styles.TextInputs}
+              />
+   
+               </View>
+               <Text style={styles.words}>Descricao </Text>
+            
+               <TextInput style={styles.TextInputsl}
+              multiline={true} />
+              <Text style={styles.words}>Imagem </Text>
+                    <TouchableOpacity
+                    style={styles.loginScreenButton}
+                    underlayColor='#fff'>
+          <Text style={styles.loginText} >Carregar foto</Text>
+             </TouchableOpacity>
+             <TouchableOpacity
+                    style={styles.loginScreenButton}
+                    underlayColor='#fff'>
+          <Text style={styles.loginText} >Requisitar reclamacao</Text>
+             </TouchableOpacity>
+           
+              </View>}
+      </View>
+       </View>
   );
 }
 
 const styles = StyleSheet.create({
+  TextInputvalor:{
+    marginTop: 22,
+    height: '50%',
+    width:'100%', 
+    backgroundColor:'#fff',
+  },
+  image: {
+    
+    width: '5%',
+    height: '200%',
+},
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    backgroundColor:'#019d96',
+    
+  },infos:{
+    backgroundColor:'#019d95',
+  
+    display: 'flex',
+   flexDirection:'row',
   },
+  infosa:{
+    height: '50%',
+    backgroundColor:'#019d95',
+  
+  }
+  ,barcode:{
+            flex:6 ,
+        backgroundColor:'#fff',
+        borderTopLeftRadius:30,
+        borderTopRightRadius:30,
+        paddingVertical:30,
+        paddingHorizontal:20,
+},
   title: {
+    color:'black',
     fontSize: 20,
     fontWeight: 'bold',
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-  linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
-  },
+  separator: {
+    marginVertical: 30,
+    height: 1,
+    width: '80%',
+  },  action:{
+    flexDirection:'row',
+    margin:10 ,
+    borderBottomWidth:1,
+    borderBottomColor:'#f2f2f2',
+    paddingBottom:5,
+},  word:{
+  paddingTop:20,
+},  loginScreenButton:{
+ marginTop:10,
+  paddingTop:10,
+  paddingBottom:10,
+  width:'100%' ,
+  backgroundColor:'#019d95',
+  borderRadius:10,
+  borderWidth: 1,
+  borderColor: '#fff'
+},
+
+
+  words:{
+    color:'#fff',
+  paddingTop:20,
+},wordsa:{
+  color:'#fff',
+paddingTop:1,
+},
+loginText:{
+    color:'#fff',
+    textAlign:'center',
+    paddingLeft : 10,
+    paddingRight : 10
+}
+,  
+TextInput:{
+    flex:1 ,
+    marginTop:Platform.OS=='ios' ? 0:-12,
+    paddingLeft:10,
+    color:'#019d95'
+},
+TextInputs:{
+  flex:1 ,
+  width: '10%',
+  height: '100%',
+  marginTop:'-0.3%',
+  paddingLeft:10,
+  backgroundColor:'#fff',
+  color:'#019d95'
+},TextInputsl:{ 
+  height:100,
+  backgroundColor:'#fff',
+  }
 });
